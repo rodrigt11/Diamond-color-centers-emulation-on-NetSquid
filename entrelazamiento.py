@@ -15,6 +15,22 @@ import netsquid.qubits.qubitapi as qapi
 from nv_2026 import NVParameterSet2026COMPUTAEX
 from snv_2026 import SnVParameterSet2026COMPUTAEX
 
+class EntanglingExchange(ns.components.QuantumProgram):
+    def __init__(self, pos):
+        self.pos = pos
+        super().__init__()
+   
+    def program(self):
+        #self.apply(INSTR_INIT, qubit_indices=1, physical=True)
+
+        #self.apply(INSTR_INIT, qubit_indices=1, physical=True)
+        #if self.operacion:
+        #    self.apply(self.operacion, qubit_indices=1, physical=True)
+
+        self.apply(ns.components.INSTR_SWAP,qubit_indices=[0,self.pos],physical=True)
+
+        yield self.run()
+
 class Entangler(Protocol):
     def __init__(self, A, B, params):
         if not isinstance(A,Node) or not isinstance(B,Node):
@@ -44,7 +60,7 @@ class Entangler(Protocol):
             visibility=p["visibility"]
         )
 
-        md = NVDoubleClickMagicDistributor(
+        self.md = NVDoubleClickMagicDistributor(
             nodes=[self.A, self.B],
             heralded_connection=conexion,
             length_A=0.5,
@@ -64,15 +80,15 @@ class Entangler(Protocol):
             delta_w=NVParameterSet2026COMPUTAEX.delta_w
         )
 
-        md.add_callback(self._on_delivery)
+        self.md.add_callback(self._on_delivery)
         
-        event = md.add_delivery(memory_positions={self.A.ID: 0, self.B.ID: 0}, coin_prob_ph_ph=1.0, coin_prob_ph_dc=1.0, coin_prob_dc_dc=1.0)
+        event = self.md.add_delivery(memory_positions={self.A.ID: 0, self.B.ID: 0}, coin_prob_ph_ph=1.0, coin_prob_ph_dc=1.0, coin_prob_dc_dc=1.0)
 
         yield self.await_signal(self,'Entrelazado')
 
-        delivery = md.peek_delivery(event, allow_archive=True)
+        self.delivery = self.md.peek_delivery(event, allow_archive=True)
         cycle_time = p["photon_emission_delay"]+(0.5/p["c"])*1e9
-        num_intentos = int(delivery.sample.delivery_duration/cycle_time)
+        num_intentos = int(self.delivery.sample.delivery_duration/cycle_time)
 
         qubit_A = self.A.qmemory.peek(positions=[0])[0]
         qubit_B = self.B.qmemory.peek(positions=[0])[0]
@@ -82,8 +98,8 @@ class Entangler(Protocol):
 
         print(qapi.reduced_dm([qubit_A, qubit_B]))
 
-        print(f'Estado de Bell: {delivery.sample.label}')
-        print(f'Tiempo de entrelazamiento: {delivery.sample.delivery_duration:.2f} ns')
+        print(f'Estado de Bell: {self.delivery.sample.label}')
+        print(f'Tiempo de entrelazamiento: {self.delivery.sample.delivery_duration:.2f} ns')
         print(f'Número de intentos: {num_intentos}')
 
 
