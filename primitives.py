@@ -13,29 +13,28 @@ import numpy as np
 ns.qubits.qformalism.set_qstate_formalism(ns.qubits.QFormalism.DM)
 
 class Initialization(QuantumProgram):
-    def __init__(self, n_qubits, state=None):
-        if not isinstance(n_qubits, int) or n_qubits <= 0:
-            raise ValueError("Number of qubits must be a positive integer")
-        if state is not None:
-            if not isinstance(state, str):
-                raise ValueError("State must be a string")
-            if len(state) != n_qubits:
-                raise ValueError("State string length must match the number of qubits")
-        self.n_qubits = n_qubits
-        self.state = state
+    """
+    Class for initializing an arbitrary number of qubits, including
+    electronic and nuclear spins, by specifying any of the computational basis states. First bit indicates electronic spin state.
+    """
+    def __init__(self, state=None):
+        self.state = str(state)
         super().__init__()
 
     def program(self):
-        for i in range(self.n_qubits):
+        for i in range(len(self.state)):
             self.apply(INSTR_INIT, qubit_indices=[i], physical=True)
-        if self.state is not None:
-            for i, char in enumerate(self.state):
-                if char == "1":
-                    self.apply(INSTR_X, qubit_indices=[i], physical=True)
+        
+        for i, char in enumerate(self.state):
+            if char == "1":
+                self.apply(INSTR_X, qubit_indices=[i], physical=True)
 
         yield self.run()
 
 class FlipBit(QuantumProgram):
+    """
+    Class used to apply X gate on some qubits. Includes electronic and nuclear spins.
+    """
     def __init__(self, qubits):
         if not isinstance(qubits, list) or not all(isinstance(q, int) for q in qubits):
             raise ValueError("Qubits must be a list of integers")
@@ -49,6 +48,9 @@ class FlipBit(QuantumProgram):
         yield self.run()
 
 class Hadamards(QuantumProgram):
+    """
+    Class used to apply H gate on some qubits. We must specify them by their indexes. Includes electronic and nuclear spins.
+    """
     def __init__(self, qubits):
         if not isinstance(qubits, list) or not all(isinstance(q, int) for q in qubits):
             raise ValueError("Qubits must be a list of integers")
@@ -62,6 +64,9 @@ class Hadamards(QuantumProgram):
         yield self.run()
         
 class RotationZ(QuantumProgram):
+    """
+    Class used to apply Z rotation on a qubit 
+    """
     def __init__(self, qubit_index, angle):
         if not isinstance(qubit_index, int):
             raise ValueError("Qubit index must be an integer")
@@ -76,7 +81,10 @@ class RotationZ(QuantumProgram):
         yield self.run()
 
 class CNOT(QuantumProgram):
-    
+    """
+    Applyes CNOT gate between two arbitrary qubits through INSTR_CXDIR and one qubit instructions. It assumes that electronic spin must always be the control
+    """
+
     def __init__(self, control, target):
         if not isinstance(control, int) or not isinstance(target, int):
             raise ValueError("Control and target qubits must be integers")
@@ -94,9 +102,11 @@ class CNOT(QuantumProgram):
             self.apply(INSTR_ROT_X, qubit_indices=[self.target], angle=-np.pi/2, physical=True)
             self.apply(INSTR_CXDIR, qubit_indices=[0, self.target], angle=np.pi/2, physical=True)
             self.apply(INSTR_SWAP, qubit_indices=[0, self.control], physical=True)
+            self.apply(INSTR_ROT_Z, qubit_indices=[self.control], angle=-np.pi/2, physical=True)
         else:
             self.apply(INSTR_ROT_X, qubit_indices=[self.target], angle=-np.pi/2, physical=True)
             self.apply(INSTR_CXDIR, qubit_indices=[0, self.target], angle=np.pi/2, physical=True)
+            self.apply(INSTR_ROT_Z, qubit_indices=[0], angle=-np.pi/2, physical=True)
         
         yield self.run()
 
@@ -121,9 +131,10 @@ class Measure(QuantumProgram):
         yield self.run()
 
 class MultiCX(QuantumProgram):
+    """
+    Applies an X gate on the target conditioned to the states of an arbitrary number of control qubits (for 3 controls and beyond is still developing)
+    """
     def __init__(self, control_qubits, target_qubit):
-        if len(control_qubits) < 2:
-            raise ValueError("At least two control qubits are required")
         if 0 in control_qubits:
             raise ValueError("Control qubits cannot include the communication qubit (index 0)")
         if not isinstance(control_qubits, list) or not all(isinstance(q, int) for q in control_qubits):
@@ -138,7 +149,10 @@ class MultiCX(QuantumProgram):
 
     def _build(self):
         
-        if len(self.control_qubits) == 2:
+        if len(self.control_qubits) == 1:
+            return CNOT(self.control_qubits[0], self.target_qubit)
+
+        elif len(self.control_qubits) == 2:
             return (
                 Hadamards([self.target_qubit]) + 
                 CNOT(self.control_qubits[1], self.target_qubit) +
@@ -162,9 +176,10 @@ class MultiCX(QuantumProgram):
         yield from self.load(self._build())
 
 class MultiCZ(QuantumProgram):
+    """
+    Applies a Z gate conditioned to the states of an arbitrary number of control spins. Based in MultiCX class.
+    """
     def __init__(self, control_qubits, target_qubit):
-        if len(control_qubits) < 2:
-            raise ValueError("At least two control qubits are required")
         if 0 in control_qubits:
             raise ValueError("Control qubits cannot include the communication qubit (index 0)")
         if not isinstance(control_qubits, list) or not all(isinstance(q, int) for q in control_qubits):
@@ -188,6 +203,9 @@ class MultiCZ(QuantumProgram):
         yield from self.load(self._build())
 
 class MultiCPhase(QuantumProgram):
+    """
+    Applies a phase gate conditioned to the state of two control qubits.
+    """
     def __init__(self, c1, c2, t, phase):
         if t == 0:
             raise ValueError("Control qubits cannot include the communication qubit (index 0)")
@@ -232,15 +250,18 @@ class MultiCPhase(QuantumProgram):
     def program(self):
         yield from self.load(self._build())
 
+
+
+# Code block only used as testbench for the classes
 if __name__ == "__main__":
     
     #pr = Initialization(n_qubits=4, state="0110") + CNOT(control=1, target=2) + Measure(qubit_index=2, output_key="result2")
     class pr(QuantumProgram):
         def _build(self):
             return (
-                Initialization(n_qubits=4, state="0110") +
-                Hadamards([3]) +
-                MultiCPhase(1,2,3,np.pi/3) 
+                Initialization(n_qubits=3, state="000") +
+                Hadamards([1]) +
+                CNOT(1,2)
             )
         
         def program(self):
@@ -251,19 +272,27 @@ if __name__ == "__main__":
     class protocol2(ns.protocols.NodeProtocol):
 
         def run(self):
-            p = pr()
-            self.node.qmemory.execute_program(p)
+            prog = pr()
+            self.node.qmemory.execute_program(prog)
             yield self.await_program(self.node.qmemory)
-            psi = np.zeros((8,1), complex)
-            psi[6, 0] = 1 / np.sqrt(2) 
-            psi[7, 0] = np.exp(1j*np.pi/3) / np.sqrt(2)
-            q1, q2, q3 = self.node.qmemory.peek([1,2,3])
-            print(ns.qubits.qubitapi.reduced_dm([q1, q2, q3]))
-            print(ns.qubits.qubitapi.fidelity([q1, q2, q3], psi))
+
+            q1, q2 = self.node.qmemory.peek([1, 2])
+            dm = ns.qubits.qubitapi.reduced_dm([q1, q2])
+
+            print(dm)
+
+            psi = np.zeros((4, 1), dtype=complex)
+            psi[0, 0] = 1 / np.sqrt(2)  # |00>
+            psi[3, 0] = 1 / np.sqrt(2)  # |11>
+
+            fidelity = ns.qubits.qubitapi.fidelity([q1,q2],psi)
+
+            print("Fidelidad con Bell canónico:", fidelity)
+            print("rho[0,3] =", dm[0, 3])
             
     
 
-    processor = NVProcessor2026(num_positions=4, noiseless=True)
+    processor = NVProcessor2026(num_positions=3, noiseless=True)
     nodo = Node("nodo", qmemory=processor)
     protocolo = protocol2(node=nodo)
     protocolo.start()
