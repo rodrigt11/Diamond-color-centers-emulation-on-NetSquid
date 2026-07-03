@@ -1,4 +1,4 @@
-# We follow the steps of Zhou, X., Xu, X., Zheng, S., & Luo, L. (2026). Distributed exact generalized Grover’s algorithm. Frontiers of Computer Science, 20(7), 2007905.
+
 # We implement DEGA for 4 qubits, across 2 NV-nodes with 1 communication qubit and 
 from netsquid.nodes import Node
 from entrelazamiento import Entangler

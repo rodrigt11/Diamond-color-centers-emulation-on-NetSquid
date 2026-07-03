@@ -250,6 +250,16 @@ class MultiCPhase(QuantumProgram):
     def program(self):
         yield from self.load(self._build())
 
+class Exchange(QuantumProgram):
+    def __init__(self, pos):
+        self.pos = pos
+        super().__init__()
+   
+    def program(self):
+        
+        self.apply(ns.components.INSTR_SWAP,qubit_indices=[0,self.pos],physical=True)
+
+        yield self.run()
 
 
 # Code block only used as testbench for the classes

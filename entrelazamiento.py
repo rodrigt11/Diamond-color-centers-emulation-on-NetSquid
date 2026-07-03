@@ -15,22 +15,6 @@ import netsquid.qubits.qubitapi as qapi
 from nv_2026 import NVParameterSet2026COMPUTAEX
 from snv_2026 import SnVParameterSet2026COMPUTAEX
 
-class EntanglingExchange(ns.components.QuantumProgram):
-    def __init__(self, pos):
-        self.pos = pos
-        super().__init__()
-   
-    def program(self):
-        #self.apply(INSTR_INIT, qubit_indices=1, physical=True)
-
-        #self.apply(INSTR_INIT, qubit_indices=1, physical=True)
-        #if self.operacion:
-        #    self.apply(self.operacion, qubit_indices=1, physical=True)
-
-        self.apply(ns.components.INSTR_SWAP,qubit_indices=[0,self.pos],physical=True)
-
-        yield self.run()
-
 class Entangler(Protocol):
     def __init__(self, A, B, params):
         if not isinstance(A,Node) or not isinstance(B,Node):

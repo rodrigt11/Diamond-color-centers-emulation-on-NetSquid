@@ -2,13 +2,14 @@
 from netsquid.nodes import Node
 from netsquid.protocols import NodeProtocol
 from netsquid.components import ClassicalChannel, FixedDelayModel, QuantumProgram, INSTR_INIT, INSTR_CXDIR, INSTR_SWAP, INSTR_MEASURE, INSTR_ROT_X
-from entrelazamiento import Entangler, EntanglingExchange
+from entrelazamiento import Entangler
 import netsquid as ns
 import numpy as np
 import netsquid.qubits.qubitapi as qapi
 from nv_2026 import NVParameterSet2026COMPUTAEX
 from procesadores import NVProcessor2026
 from netsquid.qubits.qformalism import set_qstate_formalism
+from primitives import Exchange, Initialization, CNOT, Measure, FlipBit
 
 set_qstate_formalism(ns.qubits.QFormalism.DM)
 
@@ -18,20 +19,16 @@ class Alice(QuantumProgram):
                 self.ancilla_A = ancilla_A
                 super().__init__()
 
+            def _build(self):
+                
+                return(
+                     Initialization(0) +
+                     CNOT(self.mem_A, self.ancilla_A) +
+                     Measure(self.ancilla_A, output_key="bit_alice")
+                )
+
             def program(self):
-                self.apply(INSTR_INIT, qubit_indices=0, physical=True)
-                self.apply(INSTR_SWAP, qubit_indices=[0,self.mem_A], physical=True)
-
-                self.apply(INSTR_ROT_X, qubit_indices=self.ancilla_A, angle=-np.pi/2, physical=True)
-                self.apply(INSTR_CXDIR, qubit_indices=[0,self.ancilla_A], angle=-np.pi/2, physical=True)
-
-                self.apply(INSTR_SWAP, qubit_indices=[0,self.mem_A], physical=True)
-
-                self.apply(INSTR_SWAP, qubit_indices=[0,self.ancilla_A], physical=True)
-
-                self.apply(INSTR_MEASURE, qubit_indices=0, physical=True, output_key="bit_alice")
-
-                yield self.run()
+                yield from self.load(self._build())
 
 class Bob(QuantumProgram):
             def __init__(self, aplicarX, mem_B, ancilla_B):
@@ -40,21 +37,21 @@ class Bob(QuantumProgram):
                 self.ancilla_B = ancilla_B
                 super().__init__()
             
-            def program(self):
-
-                self.apply(INSTR_INIT, qubit_indices=0, physical=True)
-
+            def _build(self):   
                 if self.aplicarX:
-                    self.apply(INSTR_ROT_X, qubit_indices=self.ancilla_B, angle=np.pi, physical=True)
+                    return (
+                        Initialization(0) +
+                        FlipBit([self.ancilla_B]) +
+                        CNOT(self.ancilla_B, self.mem_B)
+                    )
+                else:
+                    return (
+                        Initialization(0) +
+                        CNOT(self.ancilla_B, self.mem_B)
+                    )
 
-                self.apply(INSTR_SWAP, qubit_indices=[0,self.ancilla_B], physical=True)
-
-                self.apply(INSTR_ROT_X, qubit_indices=self.mem_B, angle=-np.pi/2, physical=True)
-                self.apply(INSTR_CXDIR, qubit_indices=[0,self.mem_B], angle=-np.pi/2, physical=True)
-
-                self.apply(INSTR_SWAP, qubit_indices=[0,self.ancilla_B], physical=True)
-
-                yield self.run()
+            def program(self):
+                yield from self.load(self._build())
 
 class RemoteCNOT(NodeProtocol):
     def __init__(self,nodo_A, nodo_B, mem_A, mem_B, ancilla_A, ancilla_B, entrelazador):
@@ -87,8 +84,8 @@ class RemoteCNOT(NodeProtocol):
             yield self.await_program(self.nodo_B.qmemory)
 
         print(f"[{ns.sim_time():.1f} ns] Telegate: Transfiriendo qubits a los espines nucleares de ancilla...")
-        prog_swap_A = EntanglingExchange(pos=self.ancilla_A)
-        prog_swap_B = EntanglingExchange(pos=self.ancilla_B)
+        prog_swap_A = Exchange(pos=self.ancilla_A)
+        prog_swap_B = Exchange(pos=self.ancilla_B)
         
         self.nodo_A.qmemory.execute_program(prog_swap_A)
         self.nodo_B.qmemory.execute_program(prog_swap_B)
