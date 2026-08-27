@@ -14,7 +14,7 @@ from snv_2026 import SnVParameterSet2026COMPUTAEX
 
 class NVProcessor2026(QuantumProcessor):
     
-    def __init__(self, num_positions, electron_position=0, noiseless=False, **properties):
+    def __init__(self, num_positions, noiseless=False, **properties):
         default_parameter_set = NVParameterSet2026COMPUTAEX()
         params = default_parameter_set.to_dict() if not noiseless else default_parameter_set.to_perfect_dict()
         params["use_magical_swap"] = True
@@ -22,7 +22,7 @@ class NVProcessor2026(QuantumProcessor):
         for property, value in params.items():
             self.add_property(name=property, value=value, mutable=False)
         self.emission_duration = self.properties["photon_emission_delay"]
-        self.electron_position = electron_position
+        self.electron_position = 0
         super().__init__(name="nv_center_quantum_processor",
                          num_positions=num_positions + 1,
                          mem_noise_models=self._define_memory_noise_models(num_positions))
@@ -65,8 +65,7 @@ class NVProcessor2026(QuantumProcessor):
             DepolarNoiseModel(depolar_rate=self.properties["ec_gate_depolar_prob"],
                               time_independent=True)
 
-        magical_swap_gate_depolar_prob = 1 - (1 - self.properties["ec_gate_depolar_prob"]) ** 2
-        magic_swap_noise = DepolarNoiseModel(depolar_rate=magical_swap_gate_depolar_prob,
+        magic_swap_noise = DepolarNoiseModel(depolar_rate=self.properties["magical_swap_gate_depolar_prob"],
                                              time_independent=True)
 
         self.models["electron_init_noise"] = electron_init_noise
@@ -102,7 +101,7 @@ class NVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_H,
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
         
@@ -110,7 +109,7 @@ class NVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_X,
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
         
@@ -118,7 +117,7 @@ class NVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_ROT_X,                                                               # <-------------------------------
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
 
@@ -141,7 +140,7 @@ class NVProcessor2026(QuantumProcessor):
 
         phys_instructions.append(
             PhysicalInstruction(INSTR_EMIT,
-                                paralell=False,
+                                parallel=False,
                                 topology=emit_topology,
                                 duration=self.emission_duration))
 
@@ -181,19 +180,11 @@ class NVProcessor2026(QuantumProcessor):
         for instruction in phys_instructions:
             self.add_physical_instruction(instruction)
 
-    @property
-    def electron_position(self):
-        return self._electron_position
-
-    @electron_position.setter
-    def electron_position(self, position):
-        if position < 0:
-            raise ValueError("Electron position cannot be negative.")
-        self._electron_position = position
+    
 
 class SnVProcessor2026(QuantumProcessor):
     
-    def __init__(self, num_positions, electron_position=0, noiseless=False, **properties):
+    def __init__(self, num_positions, noiseless=False, **properties):
         default_parameter_set = SnVParameterSet2026COMPUTAEX()
         params = default_parameter_set.to_dict() if not noiseless else default_parameter_set.to_perfect_dict()
         params["use_magical_swap"] = True
@@ -201,8 +192,8 @@ class SnVProcessor2026(QuantumProcessor):
         for property, value in params.items():
             self.add_property(name=property, value=value, mutable=False)
         self.emission_duration = self.properties["photon_emission_delay"]
-        self.electron_position = electron_position
-        super().__init__(name="nv_center_quantum_processor",
+        self.electron_position = 0
+        super().__init__(name="snv_center_quantum_processor",
                          num_positions=num_positions + 1,
                          mem_noise_models=self._define_memory_noise_models(num_positions))
         self._set_physical_instructions()
@@ -244,8 +235,7 @@ class SnVProcessor2026(QuantumProcessor):
             DepolarNoiseModel(depolar_rate=self.properties["ec_gate_depolar_prob"],
                               time_independent=True)
 
-        magical_swap_gate_depolar_prob = 1 - (1 - self.properties["ec_gate_depolar_prob"]) ** 2
-        magic_swap_noise = DepolarNoiseModel(depolar_rate=magical_swap_gate_depolar_prob,
+        magic_swap_noise = DepolarNoiseModel(depolar_rate=self.properties["magical_swap_gate_depolar_prob"],
                                              time_independent=True)
 
         self.models["electron_init_noise"] = electron_init_noise
@@ -277,11 +267,11 @@ class SnVProcessor2026(QuantumProcessor):
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_z_rot_duration"]))
 
-        phys_instructions.append(                                                                      # INSTRUCCIONES AÑADIDAS POR COMPUTAEX Y BASADAS EN ZHANG ET AL. (2025). 
+        phys_instructions.append(                                                                      # ADDED BY COMPUTAEX AND BASED IN ZHANG ET AL. (2025). 
             PhysicalInstruction(INSTR_H,                                                               # <------------------------------
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
         
@@ -289,7 +279,7 @@ class SnVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_X,                                                               # <-------------------------------
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
         
@@ -297,7 +287,7 @@ class SnVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_ROT_X,                                                               # <-------------------------------
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["ec_noise"],
+                                q_noise_model=self.models["carbon_z_rot _noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
 
@@ -320,7 +310,7 @@ class SnVProcessor2026(QuantumProcessor):
 
         phys_instructions.append(
             PhysicalInstruction(INSTR_EMIT,
-                                paralell=False,
+                                parallel=False,
                                 topology=emit_topology,
                                 duration=self.emission_duration))
 
@@ -360,13 +350,5 @@ class SnVProcessor2026(QuantumProcessor):
         for instruction in phys_instructions:
             self.add_physical_instruction(instruction)
 
-    @property
-    def electron_position(self):
-        return self._electron_position
-
-    @electron_position.setter
-    def electron_position(self, position):
-        if position < 0:
-            raise ValueError("Electron position cannot be negative.")
-        self._electron_position = position
+    
 

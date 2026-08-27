@@ -6,7 +6,7 @@ It then measures the resulting state and prints the results, including the Bell 
 import netsquid as ns
 from netsquid.protocols import Protocol, Signals
 from netsquid.nodes import Node
-from netsquid.components import INSTR_X
+from netsquid.components import INSTR_X, INSTR_Z
 import numpy as np
 from netsquid_physlayer.heralded_connection import MiddleHeraldedConnection
 from nv_2026 import NVParameterSet2026COMPUTAEX 
@@ -16,24 +16,34 @@ from nv_2026 import NVParameterSet2026COMPUTAEX
 from snv_2026 import SnVParameterSet2026COMPUTAEX
 
 class Entangler(Protocol):
-    def __init__(self, A, B, params):
+    def __init__(self, A, B, params, ideal=False):
         if not isinstance(A,Node) or not isinstance(B,Node):
-            raise TypeError('A y B deben ser objetos Node')
-        if not isinstance(params,NVParameterSet2026COMPUTAEX) and not isinstance(params,SnVParameterSet2026COMPUTAEX):
-            raise TypeError('Se debe dar un conjunto de parámetros')
+            raise TypeError('A and B must be instances of Node')
+        super().__init__(name=f"Entangler_{A.name}_{B.name}")
         self.A = A
         self.B = B
         self.params = params
-        self.add_signal('Entrelazado')
-        self.add_signal(Signals.FINISHED)
+        self.ideal = ideal
+
+        self.delivery = None
+        self.md = None
+
+        self.add_signal('Delivered')
+        self.add_signal("Pair ready")
 
     def _on_delivery(self, event):
-        self.send_signal('Entrelazado')
+        self.send_signal(signal_label="Delivered", result=event)
 
     def run(self):
-        print(f'[{ns.sim_time():.1f} ns ] Iniciando entrelazamiento')
+        print(f'[{ns.sim_time():.1f} ns ] Beginning entanglement...')
 
-        p = self.params.to_dict()
+        if not self.ideal:
+            p = self.params.to_dict()
+        else:
+            p = self.params.to_perfect_dict()
+
+        product = p["product_tau_decay_delta_w"]
+
         conexion = MiddleHeraldedConnection(
             name="Conexion",
             length=1,
@@ -60,31 +70,39 @@ class Entangler(Protocol):
             detector_efficiency=p["total_detection_eff"],
             dark_count_probability=p["prob_dark_count"],
             visibility=p["visibility"],
-            tau_decay=NVParameterSet2026COMPUTAEX.tau_decay,
-            delta_w=NVParameterSet2026COMPUTAEX.delta_w
+            tau_decay=self.params.tau_decay,
+            delta_w=product/self.params.tau_decay if self.params.tau_decay > 0 else 0.0
         )
 
         self.md.add_callback(self._on_delivery)
-        
+                        
         event = self.md.add_delivery(memory_positions={self.A.ID: 0, self.B.ID: 0}, coin_prob_ph_ph=1.0, coin_prob_ph_dc=1.0, coin_prob_dc_dc=1.0)
-
-        yield self.await_signal(self,'Entrelazado')
+        
+        yield self.await_signal(sender=self, signal_label="Delivered")
 
         self.delivery = self.md.peek_delivery(event, allow_archive=True)
         cycle_time = p["photon_emission_delay"]+(0.5/p["c"])*1e9
         num_intentos = int(self.delivery.sample.delivery_duration/cycle_time)
+        bell_index = self.delivery.sample.label[1]
 
         qubit_A = self.A.qmemory.peek(positions=[0])[0]
         qubit_B = self.B.qmemory.peek(positions=[0])[0]
         self.A.qmemory.execute_instruction(INSTR_X,[0])
 
+
         yield self.await_program(self.A.qmemory)
+
+        if bell_index == ns.BellIndex.B11:
+            self.A.qmemory.execute_instruction(INSTR_Z,[0])
+            yield self.await_program(self.A.qmemory)
 
         print(qapi.reduced_dm([qubit_A, qubit_B]))
 
-        print(f'Estado de Bell: {self.delivery.sample.label}')
-        print(f'Tiempo de entrelazamiento: {self.delivery.sample.delivery_duration:.2f} ns')
-        print(f'Número de intentos: {num_intentos}')
+        print(f'Bell state: {self.delivery.sample.label}')
+        print(f'Entanglement time: {self.delivery.sample.delivery_duration:.2f} ns')
+        print(f'Number of attempts: {num_intentos}')
+
+        self.send_signal("Pair ready")
 
 
 

@@ -2,132 +2,132 @@
 from netsquid.nodes import Node
 from netsquid.protocols import NodeProtocol
 from netsquid.components import ClassicalChannel, FixedDelayModel, QuantumProgram, INSTR_INIT, INSTR_CXDIR, INSTR_SWAP, INSTR_MEASURE, INSTR_ROT_X
-from entrelazamiento import Entangler
+from entanglement import Entangler
 import netsquid as ns
 import numpy as np
 import netsquid.qubits.qubitapi as qapi
 from nv_2026 import NVParameterSet2026COMPUTAEX
-from procesadores import NVProcessor2026
+from processors import NVProcessor2026
 from netsquid.qubits.qformalism import set_qstate_formalism
 from primitives import Exchange, Initialization, CNOT, Measure, FlipBit
 
 set_qstate_formalism(ns.qubits.QFormalism.DM)
 
 class Alice(QuantumProgram):
-            def __init__(self, mem_A, ancilla_A):
+            def __init__(self, mem_A, anc_A):
                 self.mem_A = mem_A
-                self.ancilla_A = ancilla_A
+                self.anc_A = anc_A
                 super().__init__()
 
             def _build(self):
                 
                 return(
                      Initialization(0) +
-                     CNOT(self.mem_A, self.ancilla_A) +
-                     Measure(self.ancilla_A, output_key="bit_alice")
+                     CNOT(self.mem_A, self.anc_A) +
+                     Measure(self.anc_A, output_key="bit_alice")
                 )
 
             def program(self):
                 yield from self.load(self._build())
 
 class Bob(QuantumProgram):
-            def __init__(self, aplicarX, mem_B, ancilla_B):
-                self.aplicarX = aplicarX
+            def __init__(self, applyX, mem_B, anc_B):
+                self.applyX = applyX
                 self.mem_B = mem_B
-                self.ancilla_B = ancilla_B
+                self.anc_B = anc_B
                 super().__init__()
             
             def _build(self):   
-                if self.aplicarX:
+                if self.applyX:
                     return (
                         Initialization(0) +
-                        FlipBit([self.ancilla_B]) +
-                        CNOT(self.ancilla_B, self.mem_B)
+                        FlipBit([self.anc_B]) +
+                        CNOT(self.anc_B, self.mem_B)
                     )
                 else:
                     return (
                         Initialization(0) +
-                        CNOT(self.ancilla_B, self.mem_B)
+                        CNOT(self.anc_B, self.mem_B)
                     )
 
             def program(self):
                 yield from self.load(self._build())
 
 class RemoteCNOT(NodeProtocol):
-    def __init__(self,nodo_A, nodo_B, mem_A, mem_B, ancilla_A, ancilla_B, entrelazador):
-        super().__init__(node=nodo_A)
-        if not isinstance(nodo_A, Node) or not isinstance(nodo_B, Node):
-            raise ValueError("nodo_A y nodo_B deben ser instancias de Node.")
-        if not isinstance(entrelazador, Entangler):
-            raise ValueError("entrelazador debe ser una instancia de Entangler.")
-        self.nodo_A = nodo_A
-        self.nodo_B = nodo_B
+    def __init__(self,node_A, node_B, mem_A, mem_B, anc_A, anc_B, entangler):
+        super().__init__(node=node_A)
+        if not isinstance(node_A, Node) or not isinstance(node_B, Node):
+            raise ValueError("node_A and node_B must be instances of Node.")
+        if not isinstance(entangler, Entangler):
+            raise ValueError("entangler must be an instance of Entangler.")
+        self.node_A = node_A
+        self.node_B = node_B
         self.mem_A = mem_A
         self.mem_B = mem_B
-        self.ancilla_A = ancilla_A
-        self.ancilla_B = ancilla_B
-        self.entrelazador = entrelazador
+        self.anc_A = anc_A
+        self.anc_B = anc_B
+        self.entangler = entangler
 
     def run(self):
-        print(f'[{ns.sim_time():.1f} ns] Iniciando CNOT remoto...')
+        print(f'[{ns.sim_time():.1f} ns] Starting remote CNOT...')
 
-        self.entrelazador.start()
+        self.entangler.start()
         
-        # Esperamos a que el Entangler termine y emita su señal nativa de éxito
-        yield self.await_signal(self.entrelazador, "Entrelazado")
-        print(f"[{ns.sim_time():.1f} ns] Telegate: ¡Entrelazamiento completado con éxito por el hardware!")
+        # Wait for the entanglement to be established
+        yield self.await_signal(self.entangler, "Entangled")
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: ¡Succesful entanglement!")
 
-        # Si los procesadores físicos quedaron ocupados con la heráldica, esperamos a que se liberen
-        if self.nodo_A.qmemory.busy:
-            yield self.await_program(self.nodo_A.qmemory)
-        if self.nodo_B.qmemory.busy:
-            yield self.await_program(self.nodo_B.qmemory)
+        # If either node's quantum processor is busy, wait for it to finish
+        if self.node_A.qmemory.busy:
+            yield self.await_program(self.node_A.qmemory)
+        if self.node_B.qmemory.busy:
+            yield self.await_program(self.node_B.qmemory)
 
-        print(f"[{ns.sim_time():.1f} ns] Telegate: Transfiriendo qubits a los espines nucleares de ancilla...")
-        prog_swap_A = Exchange(pos=self.ancilla_A)
-        prog_swap_B = Exchange(pos=self.ancilla_B)
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Exchanging qubits states between electronic and nuclear spins...")
+        prog_swap_A = Exchange(pos=self.anc_A)
+        prog_swap_B = Exchange(pos=self.anc_B)
         
-        self.nodo_A.qmemory.execute_program(prog_swap_A)
-        self.nodo_B.qmemory.execute_program(prog_swap_B)
+        self.node_A.qmemory.execute_program(prog_swap_A)
+        self.node_B.qmemory.execute_program(prog_swap_B)
         
-        # Esperamos firmemente a que AMBOS procesadores terminen el SWAP físico
-        yield self.await_program(self.nodo_A.qmemory)
-        yield self.await_program(self.nodo_B.qmemory)
+        # Waiting for the swap operations to complete
+        yield self.await_program(self.node_A.qmemory)
+        yield self.await_program(self.node_B.qmemory)
 
-        qa1 = self.nodo_A.qmemory.peek(self.ancilla_A)[0]
-        qb1 = self.nodo_B.qmemory.peek(self.ancilla_B)[0]
+        qa1 = self.node_A.qmemory.peek(self.anc_A)[0]
+        qb1 = self.node_B.qmemory.peek(self.anc_B)[0]
         
-        print("DM nucleares:")
+        print("Nuclear DM:")
         print(qapi.reduced_dm([qa1, qb1]))
-        print(f'La fidelidad con el estado |Φ+⟩ es: {qapi.fidelity([qa1, qb1], reference_state=ns.b00):.4f}')
+        print(f'Fidelity with |Φ+⟩ : {qapi.fidelity([qa1, qb1], reference_state=ns.b00):.4f}')
 
 
-        print(f"[{ns.sim_time():.1f} ns] Telegate: Ejecutando circuito local de Alice...")
-        prog_A = Alice(mem_A=self.mem_A, ancilla_A=self.ancilla_A)
-        self.nodo_A.qmemory.execute_program(prog_A)
-        yield self.await_program(self.nodo_A.qmemory)
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Executing Alice's part of the protocol...")
+        prog_A = Alice(mem_A=self.mem_A, anc_A=self.anc_A)
+        self.node_A.qmemory.execute_program(prog_A)
+        yield self.await_program(self.node_A.qmemory)
 
-        # Leemos el resultado clásico directamente del hardware de Alice
-        bit_resultado = prog_A.output['bit_alice'][0]
-        print(f"[{ns.sim_time():.1f} ns] Telegate: Alice midió el bit clásico = {bit_resultado}")
+        # We obtain the classical bit result from Alice's measurement and send it to Bob through the classical channel
+        bit_result = prog_A.output['bit_alice'][0]
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Alice measured the classical bit = {bit_result}")
 
-        print(f"[{ns.sim_time():.1f} ns] Telegate: Enviando bit a Bob a través del canal clásico...")
-        self.nodo_A.ports['c_out_A'].tx_output(bit_resultado) # Envía el bit físicamente
-        yield self.await_port_input(self.nodo_B.ports["c_in_B"])
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Sending bit to Bob through the classical channel...")
+        self.node_A.ports['c_out_A'].tx_output(bit_result) # Sends the bit physically
+        yield self.await_port_input(self.node_B.ports["c_in_B"])
 
-        mensaje = self.nodo_B.ports["c_in_B"].rx_input()
-        bit_resultado = mensaje.items[0]
-        aplicarX = (bit_resultado == 1)
+        message = self.node_B.ports["c_in_B"].rx_input()
+        bit_result = message.items[0]
+        applyX = (bit_result == 1)
 
-        print(f"[{ns.sim_time():.1f} ns] Telegate: Bob recibe el bit. Ejecutando su Telegate (aplicarX={aplicarX})...")
-        prog_B = Bob(aplicarX=aplicarX, mem_B=self.mem_B, ancilla_B=self.ancilla_B)
-        self.nodo_B.qmemory.execute_program(prog_B)
-        yield self.await_program(self.nodo_B.qmemory)
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Bob receives the bit. Executing his part of the protocol (applyX={applyX})...")
+        prog_B = Bob(applyX=applyX, mem_B=self.mem_B, anc_B=self.anc_B)
+        self.node_B.qmemory.execute_program(prog_B)
+        yield self.await_program(self.node_B.qmemory)
 
-        print(f"[{ns.sim_time():.1f} ns] Telegate: ¡Proceso Telegate finalizado por completo!")
+        print(f"[{ns.sim_time():.1f} ns] Remote CNOT: Protocol completed. Final states of the nuclear spins:")
 
 if __name__ == "__main__":
-    modelo = FixedDelayModel(250.)
+    model = FixedDelayModel(250.)
     # Hardware
     A = Node('Alice', 
             qmemory=NVProcessor2026(3), 
@@ -136,12 +136,12 @@ if __name__ == "__main__":
             qmemory=NVProcessor2026(3),
             port_names=['c_in_B','out_B'])
 
-    canal = ClassicalChannel("CanalClasico", length=0.001, models={"delay_model": modelo})
+    channel = ClassicalChannel("ClasicalChannel", length=0.001, models={"delay_model": model})
 
-    A.ports["c_out_A"].connect(canal.ports["send"])
-    canal.ports["recv"].connect(B.ports["c_in_B"])
+    A.ports["c_out_A"].connect(channel.ports["send"])
+    channel.ports["recv"].connect(B.ports["c_in_B"])
 
-    # Preparación de qubits
+    # Qubits' initial states
     proga = QuantumProgram()
     progb = QuantumProgram()
 
@@ -156,24 +156,23 @@ if __name__ == "__main__":
     A.qmemory.execute_program(proga)
     B.qmemory.execute_program(progb)
 
-    # Simulación
-    entrelazamiento = Entangler(A, B, NVParameterSet2026COMPUTAEX())
+    # Emulation
+    entanglement = Entangler(A, B, NVParameterSet2026COMPUTAEX())
 
-    # Instanciamos ÚNICAMENTE el protocolo maestro encargado de la coreografía
-    protocolo_maestro = RemoteCNOT(A, B, 1, 1, 2, 2, entrelazador=entrelazamiento)
-    protocolo_maestro.start()
+    master = RemoteCNOT(A, B, 1, 1, 2, 2, entangler=entanglement)
+    master.start()
 
     ns.sim_run()
 
-    print("\n================ INSPECCIÓN DE RESULTADOS ================")
-    qubit_final_A = A.qmemory.peek(1)[0]
-    qubit_final_B = B.qmemory.peek(1)[0]
+    print("\n================ RESULTS ================")
+    qf_A = A.qmemory.peek(1)[0]
+    qf_B = B.qmemory.peek(1)[0]
 
-    if qubit_final_B is not None:
-        print("¡ÉXITO! El núcleo de Bob contiene el qubit procesado.")
-        print("Matriz de densidad final entre espines nucleares:")
-        print(qapi.reduced_dm([qubit_final_A, qubit_final_B]))
+    if qf_B is not None:
+        print("SUCCESS! Bob's nuclear spin is not empty (not None).")
+        print("Final density matrix for control and target qubits (nuclear spins):")
+        print(qapi.reduced_dm([qf_A, qf_B]))
     else:
-        print("🚨 ERROR: El núcleo de Bob sigue estando vacío (None).")
+        print("🚨 ERROR: Bob's nuclear spin is still empty (None).")
     print("==========================================================")
         

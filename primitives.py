@@ -3,10 +3,11 @@ This file contains useful primitives for computing with color centers in NetSqui
 '''
 
 from netsquid.nodes import Node
-from entrelazamiento import Entangler
+from entanglement import Entangler
 from nv_2026 import NVParameterSet2026COMPUTAEX
-from procesadores import NVProcessor2026, SnVProcessor2026
+from processors import NVProcessor2026, SnVProcessor2026
 from netsquid.components import INSTR_MEASURE, INSTR_SWAP, QuantumProgram, INSTR_H, INSTR_INIT, INSTR_X, INSTR_CXDIR, INSTR_ROT_X, INSTR_ROT_Z
+from itertools import combinations
 import netsquid as ns
 import numpy as np
 
@@ -82,7 +83,7 @@ class RotationZ(QuantumProgram):
 
 class CNOT(QuantumProgram):
     """
-    Applyes CNOT gate between two arbitrary qubits through INSTR_CXDIR and one qubit instructions. It assumes that electronic spin must always be the control
+    Applyes CNOT gate between two arbitrary qubits through INSTR_CXDIR and one qubit instructions. It assumes that electronic spin must always be the control qubit
     """
 
     def __init__(self, control, target):
@@ -202,7 +203,7 @@ class MultiCZ(QuantumProgram):
     def program(self):
         yield from self.load(self._build())
 
-class MultiCPhase(QuantumProgram):
+class MultiCPhase1(QuantumProgram):
     """
     Applies a phase gate conditioned to the state of two control qubits.
     """
@@ -250,6 +251,70 @@ class MultiCPhase(QuantumProgram):
     def program(self):
         yield from self.load(self._build())
 
+class MultiCPhase2(QuantumProgram):
+
+    """
+    Applies an arbitrary phase gate conditioned to the state of an arbitrary number of control qubits. It is based in the decomposition in Pauili operators
+    """
+
+    def __init__(self, qubits, phase):
+        if not isinstance(qubits, list) or not all(isinstance(q, int) for q in qubits):
+            raise ValueError("Qubits must be a list of integers")
+        if not isinstance(phase, (int, float)):
+            raise ValueError("Phase must be a number")
+        if len(qubits) < 2:
+            raise ValueError("At least two qubits are required")
+        if any(q < 0 for q in qubits):
+            raise ValueError("Qubit indices must be non-negative integers")
+        if len(qubits) != len(set(qubits)):
+            raise ValueError("Qubit indices must be unique")
+        self.qubits = qubits
+        self.phase = phase
+        super().__init__()
+
+    def _build(self):
+        n = len(self.qubits)
+        base_angle = self.phase / (2 ** (n - 1))
+
+        program = None
+
+        for subset_size in range(1, n + 1):
+            if subset_size % 2 == 1:
+                angle = base_angle
+            else:
+                angle = -base_angle
+
+            for subset in combinations(self.qubits, subset_size):
+                if subset_size == 1:
+                    term = RotationZ(subset[0], angle)
+                else: 
+                    accumulator = subset[-1]
+                    controls = subset[:-1]
+
+                    term = None
+
+                    for control in controls:
+                        gate = CNOT(control, accumulator)
+                        if term is None:
+                            term = gate
+                        else:
+                            term += gate
+
+                    term += RotationZ(accumulator, angle)
+
+                    for control in reversed(controls):
+                        term += CNOT(control, accumulator)
+
+                if program is None:
+                    program = term
+                else:
+                    program += term
+
+        return program
+
+    def program(self):
+        yield from self.load(self._build())
+
 class Exchange(QuantumProgram):
     def __init__(self, pos):
         self.pos = pos
@@ -266,43 +331,31 @@ class Exchange(QuantumProgram):
 if __name__ == "__main__":
     
     #pr = Initialization(n_qubits=4, state="0110") + CNOT(control=1, target=2) + Measure(qubit_index=2, output_key="result2")
-    class pr(QuantumProgram):
-        def _build(self):
-            return (
-                Initialization(n_qubits=3, state="000") +
-                Hadamards([1]) +
-                CNOT(1,2)
-            )
-        
-        def program(self):
-            yield from self.load(self._build())
+    program = Initialization("0000") + Hadamards([0,1,2,3]) + MultiCPhase2([0,1,2,3], np.pi)
 
     # Example usage
     
     class protocol2(ns.protocols.NodeProtocol):
 
         def run(self):
-            prog = pr()
+            prog = program
             self.node.qmemory.execute_program(prog)
             yield self.await_program(self.node.qmemory)
 
-            q1, q2 = self.node.qmemory.peek([1, 2])
-            dm = ns.qubits.qubitapi.reduced_dm([q1, q2])
+            q1, q2, q3, q4 = self.node.qmemory.peek([0, 1, 2, 3])
+            dm = ns.qubits.qubitapi.reduced_dm([q1, q2, q3, q4])
+
+            psi_ideal = np.ones(16, dtype=complex) / 4
+            psi_ideal[-1] *= np.exp(1j * np.pi)
+            rho_ideal = np.outer(psi_ideal, psi_ideal.conj())
+            
+            fidelity = np.real(np.trace(rho_ideal @ dm))
+            print("Fidelidad MCPhase con electrón:", fidelity)
 
             print(dm)
-
-            psi = np.zeros((4, 1), dtype=complex)
-            psi[0, 0] = 1 / np.sqrt(2)  # |00>
-            psi[3, 0] = 1 / np.sqrt(2)  # |11>
-
-            fidelity = ns.qubits.qubitapi.fidelity([q1,q2],psi)
-
-            print("Fidelidad con Bell canónico:", fidelity)
-            print("rho[0,3] =", dm[0, 3])
-            
     
 
-    processor = NVProcessor2026(num_positions=3, noiseless=True)
+    processor = NVProcessor2026(num_positions=4, noiseless=True)
     nodo = Node("nodo", qmemory=processor)
     protocolo = protocol2(node=nodo)
     protocolo.start()

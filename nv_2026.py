@@ -11,6 +11,10 @@ class NVParameterSet2026COMPUTAEX(NVParameterSet):
     Parámetros para centros NV recogidos de distintos artículos científicos por Fundación COMPUTAEX
     """
     _REQUIRED_PARAMETERS = NVParameterSet._REQUIRED_PARAMETERS + [
+        Parameter(name="magical_swap_gate_depolar_prob",
+                  units=None,
+                  perfect_value=0.,
+                  type=float),
         Parameter(name="carbon_init_duration",
                   units="ns",
                   perfect_value=0.,
@@ -101,9 +105,9 @@ class NVParameterSet2026COMPUTAEX(NVParameterSet):
     p_fail_class_corr = 0.
     initial_nuclear_phase = 0.
 
-    delta_w = 77.  # Original from QuTech, in kHz / (2pi)
+    delta_w = 2 * np.pi * 77000. * 10 ** -9  # Original from QuTech, in rad/ns
     tau_decay = 163.  # From QuTech, in ns
-    product_tau_decay_delta_w = tau_decay * 10 ** (-9) * delta_w * 2 * np.pi * 10 ** 3
+    product_tau_decay_delta_w = tau_decay * delta_w 
 
     electron_T1 = 3600.0*10**9 # Joas et al. (2024)
     electron_T2 = 1.58*10**9 #Abobeih et al.(2018)
@@ -117,6 +121,7 @@ class NVParameterSet2026COMPUTAEX(NVParameterSet):
     carbon_init_depolar_prob = 0.
     carbon_z_rot_depolar_prob = (4./3.) * (1. - 0.9994)
     ec_gate_depolar_prob = (4./3.) * (1. - 0.9994)
+    magical_swap_gate_depolar_prob = (4./3.) * (1. - 0.987)
 
     carbon_init_duration = 310.0*10**3
     carbon_z_rot_duration = 100.0*10**3 # Bartling et al.(2025)

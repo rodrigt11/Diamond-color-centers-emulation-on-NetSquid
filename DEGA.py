@@ -1,9 +1,9 @@
 
 # We implement DEGA for 4 qubits, across 2 NV-nodes with 1 communication qubit and 
 from netsquid.nodes import Node
-from entrelazamiento import Entangler
+from entanglement import Entangler
 from nv_2026 import NVParameterSet2026COMPUTAEX
-from procesadores import NVProcessor2026, SnVProcessor2026
+from processors import NVProcessor2026, SnVProcessor2026
 from netsquid.components import INSTR_SWAP, QuantumProgram, INSTR_H, INSTR_INIT, INSTR_X, INSTR_CXDIR, INSTR_ROT_X
 from primitives import Initialization, FlipBit, Hadamards, MultiCZ, Measure, MultiCPhase
 from collections import Counter
@@ -84,20 +84,20 @@ def sample_dega(marked_state, shots=1000, processor_type=NVProcessor2026, noisel
 
     print()
     print("====================================")
-    print("RESULTADOS DEGA")
+    print("DEGA RESULTS")
     print("====================================")
-    print(f"Estado marcado: {marked_state}")
-    print(f"Subestados locales: {divided_state_ref}")
-    print(f"Procesador: {processor_type.__name__}")
+    print(f"Marked state: {marked_state}")
+    print(f"Local states: {divided_state_ref}")
+    print(f"Processor: {processor_type.__name__}")
     print(f"Noiseless: {noiseless}")
     print(f"Shots: {shots}")
-    print(f"Éxitos: {success_count}")
-    print(f"Probabilidad de éxito: {p_success:.6f}")
+    print(f"Successes: {success_count}")
+    print(f"Success probability: {p_success:.6f}")
 
     print()
-    print("Distribuciones locales:")
+    print("Local distributions:")
     for i, counter in enumerate(local_counts):
-        print(f"  Node {i}, target local {divided_state_ref[i]}:")
+        print(f"  Node {i}, local target {divided_state_ref[i]}:")
         for state, count in counter.most_common():
             print(f"    {state}: {count} ({count/shots:.6f})")
 
@@ -159,7 +159,7 @@ class Diffusion(QuantumProgram):
 
         h_layer_1 = Hadamards(data_qubits)
 
-        # R_0: marca |0...0>, reutilizando Oracle
+        # R_0: marks |0...0>, reusing Oracle
         r0 = Oracle(marked_state="0" * self.marked_state_length)
 
         # H^{⊗n} final
@@ -276,13 +276,13 @@ class DEGAMasterProtocol(ns.protocols.protocol.Protocol):
         self.success = global_result == self.marked_state
         
         if self.verbose:
-            print(f"Resultado DEGA: {self.result}")
-            print(f"Resultado marcado: {self.marked_state}")
+            print(f"DEGA Result: {self.result}")
+            print(f"Marked state: {self.marked_state}")
 
             if global_result == self.marked_state:
-                print("ÉXITO")
+                print("SUCCESS")
             else:
-                print("FALLO")
+                print("FAILURE")
 
 
 class DEGAProtocol(ns.protocols.NodeProtocol):

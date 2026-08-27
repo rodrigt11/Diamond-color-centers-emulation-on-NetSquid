@@ -7,6 +7,10 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
     Parámetros para centros SnV recogidos de distintos artículos científicos por Fundación COMPUTAEX
     """
     _REQUIRED_PARAMETERS = NVParameterSet._REQUIRED_PARAMETERS + [
+        Parameter(name="magical_swap_gate_depolar_prob",
+                  units=None,
+                  perfect_value=0.,
+                  type=float),
         Parameter(name="carbon_init_duration",
                   units="ns",
                   perfect_value=0.,
@@ -72,7 +76,6 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
     tau_emissions = 6.67
 
     real_detection_eff = 0.8
-    total_detection_eff = 0.0004
     p_loss_lengths_with_conversion = 0.5
     p_loss_lengths_no_conversion = 5.
     p_zero_phonon = lambda cavity: 0.80 if cavity else 0.57 
@@ -97,9 +100,9 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
     p_fail_class_corr = 0.
     initial_nuclear_phase = 0.
 
-    delta_w = 77.  # in kHz / (2pi), see table I
+    delta_w = 2 * np.pi * 77000. * 10 ** -9  # Original from QuTech, in rad/ns
     tau_decay = 163.  # in ns, see figure (2)
-    product_tau_decay_delta_w = tau_decay * 10 ** (-9) * delta_w * 2 * np.pi * 10 ** 3
+    product_tau_decay_delta_w = tau_decay * delta_w 
 
     electron_T1 = 200.0*10**9 # Rosenthal et al. (2023)
     electron_T2 = 10.0*10**6 #Rosenthal et al.(2023)
@@ -113,6 +116,7 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
     carbon_init_depolar_prob = 0.
     carbon_z_rot_depolar_prob = (4./3.) * (1. - 1.)
     ec_gate_depolar_prob = (4./3.) * (1. - 0.8740)
+    magical_swap_gate_depolar_prob = (4./3.) * (1. - 0.987)
 
     carbon_init_duration = 310E3
     carbon_z_rot_duration = 100.0*10**3
