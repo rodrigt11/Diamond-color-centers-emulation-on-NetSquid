@@ -1,29 +1,31 @@
 # Diamond color centers emulation on NetSquid
-This repository contains a NetSquid-based implementation of distributed quantum search algorithms on colour-centre quantum processors. The current focus is the implementation of the Distributed Exact Grover's Algorithm (DEGA) using physically motivated models of NV and SnV centres in diamond.
+This repository contains a NetSquid-based distributed color center emulation platform. The framework allow us to run algorithms using NV or SnV QPUs with accurate noise dynamics. 
 
-The long-term goal of the project is to extend this framework towards the Distributed Exact Generalized Grover's Algorithm (DEGGA), where multi-target search problems require distributed multi-controlled phase operations between quantum nodes.
+The long-term goal of the project is to extend this framework scale. Increasing the number of qubits and QPUs is not manageable in practice with laptops, so more powerful systems are needed.
 
 ## Project Overview
 The code models a distributed quantum-computing architecture where each colour-centre node contains:
 - One electronic spin used as communication/control/processing qubit.
 - Nuclear spins used as data/memory qubits.
 - an emission position for photonic entanglement generation
-We include an example of application: DEGA
+We include examples of application: DEGA and DEGGA
 
 
 ## Repository Structure
-. 
-├── DEGA.py 
-├── primitives.py 
-├── procesadores.py 
-├── nv_2026.py 
-├── snv_2026.py 
-├── entrelazamiento.py 
-├── telegate.py 
-└── README.md
+- DEGA.py 
+- DEGGA.py
+- primitives.py 
+- processors.py 
+- nv_2026.py 
+- snv_2026.py 
+- entanglement.py 
+- telegate.py 
 
 `DEGA.py`
 We implement Distributed Exact Grover's Algorithm as an example of application on this emulator.
+
+`DEGGA.py`
+We implement Distributed Exact Generalized Grover's Algorithm as an example of application on this emulator.
 
 `primitives.py`
 Contains a set of hardware-aware primitives used by the algorithms.
@@ -69,24 +71,14 @@ For example, logical operations between two nuclear-spin qubits are mediated thr
 
 This project requires:
 
-Python 3
-NumPy
-NetSquid
-netsquid-nv
-custom local modules included in this repository
+- Python 3
+- NumPy
+- NetSquid
+- netsquid-nv
+- Custom local modules included in this repository
 
 NetSquid is not distributed through the standard PyPI index. It must be installed following the official NetSquid installation instructions.
 
 ## Development Status
 
-This repository is part of an ongoing research and emulation project. The current code is intended for experimentation, validation, and progressive development rather than as a finalized software package.
-
-Planned improvements include:
-
-- full English translation,
-- clearer module documentation,
-- unit tests for primitives,
-- automated noiseless validation,
-- sampling utilities for noisy simulations,
-- DEGGA implementation,
-- distributed multi-controlled phase gates.
+This repository is part of an ongoing research and emulation project. The current task is the implementation in the Lusitania supercomputer, controlled by COMPUTAEX (Extremadura Supercomputing Center)
