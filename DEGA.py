@@ -1,11 +1,9 @@
 
 # We implement DEGA for 4 qubits, across 2 NV-nodes with 1 communication qubit and 
 from netsquid.nodes import Node
-from entanglement import Entangler
-from nv_2026 import NVParameterSet2026COMPUTAEX
 from processors import NVProcessor2026, SnVProcessor2026
-from netsquid.components import INSTR_SWAP, QuantumProgram, INSTR_H, INSTR_INIT, INSTR_X, INSTR_CXDIR, INSTR_ROT_X
-from primitives import Initialization, FlipBit, Hadamards, MultiCZ, Measure, MultiCPhase
+from netsquid.components import QuantumProgram
+from primitives import Initialization, FlipBit, Hadamards, Measure, MultiCPhase2
 from collections import Counter
 import netsquid as ns
 import numpy as np
@@ -50,6 +48,9 @@ def sample_dega(marked_state, shots=1000, processor_type=NVProcessor2026, noisel
     """
     Function to run DEGA an arbitrary number of times.
     """
+    if not isinstance(shots, int) or shots <= 0:
+        raise ValueError("shots must be a positive integer")
+
     global_counts = Counter()
     success_count = 0
 
@@ -134,10 +135,10 @@ class Oracle(QuantumProgram):
             prog = FlipBit(flip_qubits)
 
         if n == 2:
-            phase_gate = MultiCZ(data_qubits[:-1], data_qubits[-1])
-        elif n == 3:
+            phase_gate = MultiCPhase2(data_qubits, np.pi)
+        else:
             phi, j = long_phase(len(self.marked_state))
-            phase_gate = MultiCPhase(data_qubits[0], data_qubits[1], data_qubits[2], phi)
+            phase_gate = MultiCPhase2(data_qubits, phi)
 
         prog = phase_gate if prog is None else prog + phase_gate
 
@@ -216,9 +217,11 @@ class DEGA(QuantumProgram):
 
 
 class DEGAMasterProtocol(ns.protocols.protocol.Protocol):
-    def __init__(self, marked_state, processor_type, verbose, processor_kwargs=None):
+    def __init__(self, marked_state, processor_type, verbose=False, processor_kwargs=None):
         if not isinstance(marked_state, str):
             raise ValueError("Marked state must be a string")
+        if len(marked_state) < 2:
+            raise ValueError("Marked state must be at least 2 bits long")
         if not processor_type == NVProcessor2026 and not processor_type == SnVProcessor2026:
             raise ValueError("Processor type must be a colour center")
         if any(bit not in ("0", "1") for bit in marked_state):
@@ -263,12 +266,16 @@ class DEGAMasterProtocol(ns.protocols.protocol.Protocol):
 
         global_result = ""
         local_results = []
+        all_finished = self.await_signal(local_protocols[0], "FINISHED")
+        for protocol in local_protocols[1:]:
+            all_finished &= self.await_signal(protocol, "FINISHED")
+
         for protocol in local_protocols:
             protocol.start()
-            yield self.await_signal(sender=protocol, signal_label="FINISHED")
-            global_result += protocol.result
-            local_results.append(protocol.result)
+        yield all_finished
 
+        local_results = [protocol.result for protocol in local_protocols]
+        global_result = "".join(local_results)
 
         self.result = global_result
         self.local_results = local_results
@@ -311,7 +318,7 @@ class DEGAProtocol(ns.protocols.NodeProtocol):
             print(f"{self.node.name}: {self.result}")
 
         self.send_signal("FINISHED")
-
+        
 
 if __name__ == "__main__":
     
@@ -320,7 +327,24 @@ if __name__ == "__main__":
     #dega_master = DEGAMasterProtocol(marked_state, NVProcessor2026, processor_kwargs={"noiseless": False})
     #dega_master.start()
 
-    sample_dega("10100",100,processor_type=NVProcessor2026,noiseless=False)
+    #sample_dega("10100",100,processor_type=SnVProcessor2026,noiseless=True)
+    for processor_type in (
+        NVProcessor2026,
+        SnVProcessor2026
+    ):
+        execution = sample_dega(
+            marked_state="10100",
+            shots=10,
+            processor_type=processor_type,
+            noiseless=False
+        )
+
+        assert sum(execution["global_counts"].values()) == 10
+        assert all(
+            len(result) == 5
+            and set(result) <= {"0", "1"}
+            for result in execution["global_counts"]
+        )
     
     
     

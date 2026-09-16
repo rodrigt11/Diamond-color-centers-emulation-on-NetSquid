@@ -13,6 +13,7 @@ from primitives import Initialization, FlipBit, Hadamards, MultiCZ, Measure, Mul
 from collections import Counter
 import netsquid as ns
 import numpy as np
+import time
 
 ns.qubits.qformalism.set_qstate_formalism(ns.qubits.QFormalism.DM)
 
@@ -139,10 +140,7 @@ class OracleDEGGA(QuantumProgram):
         if flip_qubits:
             prog = FlipBit(flip_qubits)
     
-        if n == 2:
-            phase_gate = MultiCZ(data_qubits[:-1], data_qubits[-1])
-        else:
-            phase_gate = MultiCPhase2(data_qubits, self.phi)
+        phase_gate = MultiCPhase2(data_qubits, self.phi)
     
         prog = phase_gate if prog is None else prog + phase_gate
     
@@ -452,7 +450,7 @@ class GlobalDEGGAProtocol(Protocol):
                     print(f"Multi-Controlled Gate: Entanglement between each node's electronic spin and router's nuclear ones")
                     for k, node in enumerate(self.nodes):
                         print(f"Starting entanglement between Router and Node {k}")
-                        entangler = Entangler(node, self.router, self.params, True)
+                        entangler = Entangler(node, self.router, self.params, False)
                         entanglement_finished = self.await_signal(entangler, signal_label="Pair ready")
                         entangler.start()
                         yield entanglement_finished
@@ -709,13 +707,13 @@ class LocalDEGGAProtocol(NodeProtocol):
                 print(f"Second local step in {self.node.name} : (DiffusionDEGGA + OracleDEGGA) * (J_nj + 1) + Hadamards")
                 oracle = None
                 for target in self.local_targets:
-                    target_oracle = OracleDEGGA(target, phase_nj)
+                    target_oracle = OracleDEGGA(target, -phase_nj)
                     if oracle is None:
                         oracle = target_oracle
                     else:
                         oracle += target_oracle
                 
-                program = (DiffusionDEGGA(self.n_j, phase_nj) + oracle)* (J_nj + 1) + Hadamards([i for i in range(1, self.n_j + 1)])
+                program = (DiffusionDEGGA(self.n_j, -phase_nj) + oracle)* (J_nj + 1) + Hadamards([i for i in range(1, self.n_j + 1)])
                 self.node.qmemory.execute_program(program)
                 yield self.await_program(self.node.qmemory)
                 
@@ -723,7 +721,7 @@ class LocalDEGGAProtocol(NodeProtocol):
             elif phase == "THIRD_LOCAL_STEP":
 
                 oracle = None
-                print(f"Third local step in {self.node.name} : Initialization + Hadamards + (OracleDEGGA + DiffusionDEGGA)*(J_nj+1)")
+                print(f"Third local step in {self.node.name} : Hadamards + (OracleDEGGA + DiffusionDEGGA)*(J_nj+1)")
                 for target in self.local_targets:
                     target_oracle = OracleDEGGA(target, phase_nj)
                     if oracle is None:
@@ -767,27 +765,80 @@ class LocalDEGGAProtocol(NodeProtocol):
             self.send_signal(signal_label="LOCAL_STEP_FINISHED", result={"node_index": self.node_index, "phase": phase, "result": self.result})
 
 if __name__ == "__main__":
-    ns.sim_reset()
 
-    targets_j = [
-        "000000",
-        "111111"
-    ]
-    partition = [3, 3]
+    targets_j = ["0000", "1111"]
+    partition = [2, 2]
 
-    master = DEGGAMasterProtocol(targets_j, partition, NVProcessor2026, NVParameterSet2026COMPUTAEX(), processor_kwargs={"noiseless":True}, verbose=True)
+    processor_type = SnVProcessor2026
+    parameter_set = NVParameterSet2026COMPUTAEX()
 
-    master.start()
-    ns.sim_run()
+    shots = 20
+    initial_seed = 20260909
 
-    print("Result:", master.result)
-    print("Success:", master.success)
+    counts = Counter()
+    failures = []
+    wall_times = []
 
-    assert len(master.result) == 6
-    assert master.result in {
-        "000000",
-        "111111"
-    }
-    assert master.success is True
+    for shot in range(shots):
+        seed = initial_seed + shot
+
+        ns.sim_reset()
+        ns.set_random_state(seed=seed)
+
+        master = DEGGAMasterProtocol(
+            targets_j,
+            partition,
+            processor_type,
+            parameter_set,
+            processor_kwargs={"noiseless": False},
+            verbose=False
+        )
+
+        wall_start = time.perf_counter()
+
+        master.start()
+        ns.sim_run()
+
+        wall_time = time.perf_counter() - wall_start
+
+        counts[master.result] += 1
+        wall_times.append(wall_time)
+
+        if not master.success:
+            failures.append({
+                "shot": shot,
+                "seed": seed,
+                "result": master.result
+            })
+
+        print(
+            f"[{shot + 1:02d}/{shots}] "
+            f"seed={seed}, "
+            f"result={master.result}, "
+            f"success={master.success}, "
+            f"wall={wall_time:.2f} s"
+        )
+
+    successes = shots - len(failures)
+
+    print()
+    print("=" * 60)
+    print("IDEAL DEGGA VALIDATION")
+    print("=" * 60)
+    print("Processor:", processor_type.__name__)
+    print("Targets:", targets_j)
+    print("Partition:", partition)
+    print("Shots:", shots)
+    print("Counts:", dict(counts))
+    print("Successes:", successes)
+    print("Failures:", len(failures))
+    print("Success probability:", successes / shots)
+    print(f"Mean wall time: {np.mean(wall_times):.3f} s")
+    print(f"Wall-time standard deviation: {np.std(wall_times):.3f} s")
+
+    if failures:
+        print("Failed executions:")
+        for failure in failures:
+            print(failure)
 
     

@@ -111,9 +111,9 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
 
     prob_error_0 = 0.001
     prob_error_1 = 0.01  
-    electron_init_depolar_prob = 0.
+    electron_init_depolar_prob = (4./3.) * (1. - 0.981)
     electron_single_qubit_depolar_prob = (4./3.) * (1. - 0.9951)
-    carbon_init_depolar_prob = 0.
+    carbon_init_depolar_prob = (4./3.) * (1. - 0.874)
     carbon_z_rot_depolar_prob = (4./3.) * (1. - 1.)
     ec_gate_depolar_prob = (4./3.) * (1. - 0.8740)
     magical_swap_gate_depolar_prob = (4./3.) * (1. - 0.987)
@@ -121,8 +121,8 @@ class SnVParameterSet2026COMPUTAEX(NVParameterSet):
     carbon_init_duration = 310E3
     carbon_z_rot_duration = 100.0*10**3
     carbon_single_qubit_duration = 3.0*10**3
-    electron_init_duration = 200.0*10**6
+    electron_init_duration = 300.0*10**3
     electron_single_qubit_duration = 48.4
     ec_two_qubit_gate_duration = 700.0*10**3
-    measure_duration = 30.0*10**6
+    measure_duration = 50.*10**6
     magical_swap_gate_duration = 1.000010E6

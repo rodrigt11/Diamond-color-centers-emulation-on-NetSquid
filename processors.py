@@ -1,5 +1,5 @@
 '''
-This module defines the NVProcessor2026 and SnVProcessor2026 classes, which are quantum processors for NV centers and SiV centers, respectively, 
+This module defines the NVProcessor2026 and SnVProcessor2026 classes, which are quantum processors for NV centers and SnV centers, respectively, 
 based on parameters collected by Fundación COMPUTAEX from various scientific articles.
 '''
 
@@ -287,7 +287,7 @@ class SnVProcessor2026(QuantumProcessor):
             PhysicalInstruction(INSTR_ROT_X,                                                               # <-------------------------------
                                 parallel=False,
                                 topology=self.carbon_positions,
-                                q_noise_model=self.models["carbon_z_rot _noise"],
+                                q_noise_model=self.models["carbon_z_rot_noise"],
                                 apply_q_noise_after=True,
                                 duration=self.properties["carbon_single_qubit_duration"]))
 
