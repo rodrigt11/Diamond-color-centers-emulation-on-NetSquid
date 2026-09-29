@@ -191,7 +191,7 @@ class DEGGAMasterProtocol(Protocol):
     5. Collects and combines the local measurement results.
     """
     
-    def __init__(self, targets, partition, processor_type, params, processor_kwargs=None, verbose=True):
+    def __init__(self, targets, partition, processor_type, params, processor_kwargs=None, perfect_entanglement=False, verbose=True):
 
         if processor_type not in (NVProcessor2026, SnVProcessor2026):
             raise TypeError("processor_type must be an instance of NVProcessor2026 or SnVProcessor2026")
@@ -211,6 +211,7 @@ class DEGGAMasterProtocol(Protocol):
         self.partition = list(partition)
         self.processor_type = processor_type
         self.params = params
+        self.perfect_entanglement = perfect_entanglement
         self.verbose = verbose
         self.processor_kwargs = processor_kwargs or {}
         self.n = len(targets[0])
@@ -271,7 +272,7 @@ class DEGGAMasterProtocol(Protocol):
             self.local_protocols.append(protocol)
 
         #Creation of global protocol
-        self.global_protocol = GlobalDEGGAProtocol(self.nodes, self, self.targets, self.router, self.params, verbose=self.verbose)
+        self.global_protocol = GlobalDEGGAProtocol(self.nodes, self, self.targets, self.router, self.params, self.perfect_entanglement, verbose=self.verbose)
 
         print(f"DEGGA starts (Zhou et al. (2024)). We search the elements {self.targets} inside the space of size {2**len(self.targets[0])}. Will be initialized {len(self.partition)} {self.processor_type} nodes to search and an additional one as router")
 
@@ -388,7 +389,7 @@ class GlobalDEGGAProtocol(Protocol):
     Protocol governing the phases in which distributed gates are applied across nodes (Llovo et al. 2025).
     """
 
-    def __init__(self, nodes, master, global_targets, router, params, verbose=False):
+    def __init__(self, nodes, master, global_targets, router, params, perfect_entanglement=False, verbose=False):
 
         if not isinstance(nodes, list) or not all(isinstance(node, Node) for node in nodes):
             raise TypeError("nodes must be a list of netsquid.nodes.Node instances")
@@ -408,6 +409,7 @@ class GlobalDEGGAProtocol(Protocol):
         self.global_targets = global_targets
         self.router = router
         self.verbose = verbose
+        self.perfect_entanglement = perfect_entanglement
         self.params = params
         self.result = None
         self.add_signal("GLOBAL_STEP_FINISHED")
@@ -450,7 +452,7 @@ class GlobalDEGGAProtocol(Protocol):
                     print(f"Multi-Controlled Gate: Entanglement between each node's electronic spin and router's nuclear ones")
                     for k, node in enumerate(self.nodes):
                         print(f"Starting entanglement between Router and Node {k}")
-                        entangler = Entangler(node, self.router, self.params, False)
+                        entangler = Entangler(node, self.router, self.params, self.perfect_entanglement)
                         entanglement_finished = self.await_signal(entangler, signal_label="Pair ready")
                         entangler.start()
                         yield entanglement_finished
