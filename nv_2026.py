@@ -5,11 +5,63 @@ The class inherits from NVParameterSet and extends it with additional parameters
 from netsquid_nv.nv_parameter_set import NVParameterSet
 from netsquid_simulationtools.parameter_set import Parameter
 import numpy as np
+from parameter_loader import load_parameter_set
+from pathlib import Path
 
 class NVParameterSet2026COMPUTAEX(NVParameterSet):
     """
-    Parámetros para centros NV recogidos de distintos artículos científicos por Fundación COMPUTAEX
+    Experimental values for parameters from papers
     """
+    EXCEL_PATH = Path(__file__).resolve().parent / "parameters_NV_SnV_code_ready.xlsx"
+    CENTRE = "NV"
+
+    REQUIRED_EXCEL_KEYS = (
+        'avg_electron_electron_phase_drift',
+        'c',
+        'carbon_T1',
+        'carbon_T2',
+        'carbon_init_depolar_prob',
+        'carbon_init_duration',
+        'carbon_single_qubit_duration',
+        'carbon_z_rot_depolar_prob',
+        'carbon_z_rot_duration',
+        'coherent_phase',
+        'collection_eff_in_case_no_cavity_no_conversion',
+        'collection_eff_with_conversion',
+        'dark_count_rate',
+        'delta_w',
+        'delta_w_list',
+        'ec_gate_depolar_prob',
+        'ec_two_qubit_gate_duration',
+        'electron_T1',
+        'electron_T2',
+        'electron_init_depolar_prob',
+        'electron_init_duration',
+        'electron_single_qubit_depolar_prob',
+        'electron_single_qubit_duration',
+        'emission_fidelity',
+        'initial_nuclear_phase',
+        'length',
+        'magical_swap_gate_depolar_prob',
+        'magical_swap_gate_duration',
+        'measure_duration',
+        'p_double_exc',
+        'p_fail_class_corr',
+        'p_loss_lengths_no_conversion',
+        'p_loss_lengths_with_conversion',
+        'p_zero_phonon',
+        'photon_emission_delay',
+        'prob_error_0',
+        'prob_error_1',
+        'real_detection_eff',
+        'std_electron_electron_phase_drift',
+        'tau_decay',
+        'tau_decay_list',
+        'tau_emissions',
+        'time_window',
+        'visibility',
+        )
+
     _REQUIRED_PARAMETERS = NVParameterSet._REQUIRED_PARAMETERS + [
         Parameter(name="magical_swap_gate_depolar_prob",
                   units=None,
@@ -60,34 +112,30 @@ class NVParameterSet2026COMPUTAEX(NVParameterSet):
                   perfect_value=1.0,
                   type=float)
     ]
+    excel = load_parameter_set(EXCEL_PATH, CENTRE, required_keys=REQUIRED_EXCEL_KEYS)
     
-    c = 206753.41931034482
-
-    time_window = 7. #Iuliano et al. (2026)
-
-    visibility = 0.9 #Usual
-
-    dark_count_rate = 1. #[Hz] Iuliano et al. (2026)
+    c = float(excel["c"])
+    time_window = float(excel["time_window"])
+    visibility = float(excel["visibility"])
+    dark_count_rate = float(excel["dark_count_rate"])
     prob_dark_count = 1. - np.exp(-1. * time_window * 10 ** (-9) * dark_count_rate)
 
-    avg_electron_electron_phase_drift = 0.
-    std_electron_electron_phase_drift = 20. * np.pi / 180.  # [radians]
+    avg_electron_electron_phase_drift = float(excel["avg_electron_electron_phase_drift"])
+    std_electron_electron_phase_drift = float(excel["std_electron_electron_phase_drift"])
+    p_double_exc = float(excel["p_double_exc"])
+    photon_emission_delay = float(excel["photon_emission_delay"])
+    emission_fidelity = float(excel["emission_fidelity"])
 
-    p_double_exc = 0.03
+    tau_emissions = staticmethod(lambda cavity, values=excel["tau_emissions"]: values[0] if cavity else values[1])
 
-    photon_emission_delay = 8.392*10**3 #Iuliano et al. (2026)
-    emission_fidelity = 0.77 #Iuliano et al. (2026)
-
-    tau_emissions = lambda cavity: 6.48 if cavity else 12
-
-    real_detection_eff = 0.8
-    p_loss_lengths_with_conversion = 0.5
-    p_loss_lengths_no_conversion = 5.
-    p_zero_phonon = lambda cavity: 0.46 if cavity else 0.03
+    real_detection_eff = float(excel["real_detection_eff"])
+    p_loss_lengths_with_conversion = float(excel["p_loss_lengths_with_conversion"])
+    p_loss_lengths_no_conversion = float(excel["p_loss_lengths_no_conversion"])
+    p_zero_phonon = staticmethod(lambda cavity, values=excel["p_zero_phonon"]: values[0] if cavity else values[1])
     zero_phonon_prob = p_zero_phonon(cavity=False)
-    length = 0.001  
+    length = float(excel["length"])
     p_photon_not_lost = 10 ** (-1. * p_loss_lengths_no_conversion * length / 10.)
-    collection_eff_in_case_no_cavity_no_conversion = 0.0497
+    collection_eff_in_case_no_cavity_no_conversion = float(excel["collection_eff_in_case_no_cavity_no_conversion"])
     collection_eff_with_conversion = collection_eff_in_case_no_cavity_no_conversion * 0.3
     total_detection_eff = p_photon_not_lost * p_zero_phonon(cavity=False) * real_detection_eff * collection_eff_in_case_no_cavity_no_conversion
     
@@ -98,39 +146,37 @@ class NVParameterSet2026COMPUTAEX(NVParameterSet):
         collection_eff_in_case_no_cavity_no_conversion * \
         real_detection_eff
             
-    delta_w_list = [377, 62, 77]  # in kHz / (2pi)
-    tau_decay_list = [263, 837, 640]  # in ns
-
-    coherent_phase = 0.
-    p_fail_class_corr = 0.
-    initial_nuclear_phase = 0.
-
-    delta_w = 2 * np.pi * 77000. * 10 ** -9  # Original from QuTech, in rad/ns
-    tau_decay = 163.  # From QuTech, in ns
+    delta_w_list = excel["delta_w_list"]
+    tau_decay_list = excel["tau_decay_list"]
+    coherent_phase = float(excel["coherent_phase"])
+    p_fail_class_corr = float(excel["p_fail_class_corr"])
+    initial_nuclear_phase = float(excel["initial_nuclear_phase"])
+    delta_w = float(excel["delta_w"])
+    tau_decay = float(excel["tau_decay"])
     product_tau_decay_delta_w = tau_decay * delta_w 
 
-    electron_T1 = 3600.0*10**9 # Joas et al. (2024)
-    electron_T2 = 1.58*10**9 #Abobeih et al.(2018)
-    carbon_T1 = 10.0*3600.0*10**9
-    carbon_T2 = 37.0*10**9 #Bartling et al.(2025)
+    electron_T1 = float(excel["electron_T1"])
+    electron_T2 = float(excel["electron_T2"])
+    carbon_T1 = float(excel["carbon_T1"])
+    carbon_T2 = float(excel["carbon_T2"])
 
-    prob_error_0 = 0.001
-    prob_error_1 = 0.01 
-    electron_init_depolar_prob = (4./3.) * (1. - 0.981)
-    electron_single_qubit_depolar_prob = (4./3.) * (1. - 0.9993)
-    carbon_init_depolar_prob = (4./3.) * (1. - 0.874)
-    carbon_z_rot_depolar_prob = (4./3.) * (1. - 0.9994)
-    ec_gate_depolar_prob = (4./3.) * (1. - 0.9994)
-    magical_swap_gate_depolar_prob = (4./3.) * (1. - 0.987)
+    prob_error_0 = float(excel["prob_error_0"])
+    prob_error_1 = float(excel["prob_error_1"]) 
+    electron_init_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["electron_init_depolar_prob"]))
+    electron_single_qubit_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["electron_single_qubit_depolar_prob"]))
+    carbon_init_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["carbon_init_depolar_prob"]))
+    carbon_z_rot_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["carbon_z_rot_depolar_prob"]))
+    ec_gate_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["ec_gate_depolar_prob"]))
+    magical_swap_gate_depolar_prob = (4.0 / 3.0) * (1.0 - float(excel["magical_swap_gate_depolar_prob"]))
 
-    carbon_init_duration = 310.0*10**3
-    carbon_z_rot_duration = 100.0*10**3 # Bartling et al.(2025)
-    carbon_single_qubit_duration = 3.0*10**3 
-    electron_init_duration = 2.0*10**3
-    electron_single_qubit_duration = 144.0 # Bartling et al.(2025)
-    ec_two_qubit_gate_duration = 700.0*10**3 
-    measure_duration = 190.0*10**3
-    magical_swap_gate_duration = 1.000010E6
+    carbon_init_duration = float(excel["carbon_init_duration"])
+    carbon_z_rot_duration = float(excel["carbon_z_rot_duration"])
+    carbon_single_qubit_duration = float(excel["carbon_single_qubit_duration"])
+    electron_init_duration = float(excel["electron_init_duration"])
+    electron_single_qubit_duration = float(excel["electron_single_qubit_duration"])
+    ec_two_qubit_gate_duration = float(excel["ec_two_qubit_gate_duration"])
+    measure_duration = float(excel["measure_duration"])
+    magical_swap_gate_duration = float(excel["magical_swap_gate_duration"])
         
 
 
